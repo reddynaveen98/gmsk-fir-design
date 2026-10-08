@@ -1,0 +1,1336 @@
+<!doctype html><html lang="en"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1"></head><body>
+<title>FIR Filter Designer</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=IBM+Plex+Mono:wght@400;500&family=IBM+Plex+Sans+Condensed:wght@500;600&family=IBM+Plex+Sans:wght@400;500;600&display=swap">
+<style>
+/* Layout: instrument-style workbench. Settings rail on the left, plot and readouts on the right; stacks on phones. */
+:root {
+  --bg: #eceff3; --panel: #ffffff; --panel-2: #f5f7fa; --ink: #17212c; --muted: #5a6776; --line: #d3dae2;
+  --accent: #1d5fc4; --accent-ink: #ffffff; --trace-q: #c8740f; --trace-ref: #7b4db8; --grid: #e3e8ee;
+  --good: #1c8656; --good-bg: #e2f4ea; --bad: #bf3a2b; --bad-bg: #fbe6e3; --warn: #96620a; --warn-bg: #fbf0d9;
+  --f-display: "IBM Plex Sans Condensed", "Arial Narrow", system-ui, sans-serif;
+  --f-body: "IBM Plex Sans", system-ui, -apple-system, "Segoe UI", sans-serif;
+  --f-mono: "IBM Plex Mono", ui-monospace, "Cascadia Mono", Consolas, monospace;
+  --r: 6px;
+}
+@media (prefers-color-scheme: dark) { :root:not([data-theme="light"]) {
+  --bg: #0f141a; --panel: #171e26; --panel-2: #1d2630; --ink: #e2e8ee; --muted: #94a1ae; --line: #2b3642;
+  --accent: #6ea8ff; --accent-ink: #0b1420; --trace-q: #f2b14a; --trace-ref: #c4a0f7; --grid: #222c37;
+  --good: #52d197; --good-bg: #133326; --bad: #ff8070; --bad-bg: #3a1a17; --warn: #f2c063; --warn-bg: #352a12;
+  color-scheme: dark; } }
+:root[data-theme="dark"] {
+  --bg: #0f141a; --panel: #171e26; --panel-2: #1d2630; --ink: #e2e8ee; --muted: #94a1ae; --line: #2b3642;
+  --accent: #6ea8ff; --accent-ink: #0b1420; --trace-q: #f2b14a; --trace-ref: #c4a0f7; --grid: #222c37;
+  --good: #52d197; --good-bg: #133326; --bad: #ff8070; --bad-bg: #3a1a17; --warn: #f2c063; --warn-bg: #352a12;
+  color-scheme: dark; }
+
+* { box-sizing: border-box; }
+[hidden] { display: none !important; }
+body { background: var(--bg); color: var(--ink); font: 14px/1.45 var(--f-body); }
+.wrap { max-width: 1480px; margin: 0 auto; padding-inline: 16px; padding-block: 16px 40px; display: grid; gap: 16px; }
+header.top { display: flex; flex-wrap: wrap; align-items: baseline; gap: 8px 20px; }
+h1 { font: 600 1.55rem/1.1 var(--f-display); letter-spacing: .01em; margin: 0; text-wrap: balance; }
+.sub { color: var(--muted); margin: 0; }
+.chips { display: flex; flex-wrap: wrap; gap: 6px; margin-left: auto; }
+.chip { font: 500 12px var(--f-mono); padding: 3px 8px; border: 1px solid var(--line); border-radius: 99px; background: var(--panel); white-space: nowrap; }
+.chip.ok { color: var(--good); background: var(--good-bg); border-color: transparent; }
+.chip.err { color: var(--bad); background: var(--bad-bg); border-color: transparent; }
+
+.layout { display: grid; grid-template-columns: minmax(300px, 360px) minmax(0, 1fr); gap: 16px; align-items: start; }
+@media (max-width: 900px) { .layout { grid-template-columns: minmax(0, 1fr); } }
+
+aside.rail { background: var(--panel); border: 1px solid var(--line); border-radius: var(--r); display: grid; }
+@media (min-width: 901px) { aside.rail { position: sticky; top: calc(env(safe-area-inset-top, 0px) + 12px); max-height: calc(100vh - 24px); overflow: auto; } }
+fieldset { border: 0; border-bottom: 1px solid var(--line); margin: 0; padding: 14px 16px 16px; display: grid; gap: 10px; min-width: 0; }
+fieldset:last-child { border-bottom: 0; }
+legend, .label { font: 600 11px var(--f-display); text-transform: uppercase; letter-spacing: .09em; color: var(--muted); padding: 0; }
+legend { float: left; width: 100%; margin-bottom: 2px; }
+legend + * { clear: both; }
+.row { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 10px; }
+.row.three { grid-template-columns: repeat(3, minmax(0, 1fr)); }
+.field { display: grid; gap: 3px; min-width: 0; }
+.field > span { font-size: 12px; color: var(--muted); }
+.field > span b { font: 500 11px var(--f-mono); color: var(--ink); }
+input[type=number], input[type=text], select, textarea {
+  width: 100%; min-width: 0; font: 13px var(--f-mono); color: var(--ink); background: var(--panel-2);
+  border: 1px solid var(--line); border-radius: 4px; padding: 6px 8px; font-variant-numeric: tabular-nums; }
+select { font-family: var(--f-body); }
+textarea { resize: vertical; min-height: 90px; line-height: 1.35; }
+input:focus-visible, select:focus-visible, textarea:focus-visible, button:focus-visible, label.seg input:focus-visible + span {
+  outline: 2px solid var(--accent); outline-offset: 1px; }
+.seg { display: grid; grid-template-columns: repeat(4, minmax(0, 1fr)); border: 1px solid var(--line); border-radius: 5px; overflow: hidden; }
+.seg.two { grid-template-columns: repeat(2, minmax(0, 1fr)); }
+.seg label { position: relative; }
+.seg input { position: absolute; opacity: 0; inset: 0; margin: 0; cursor: pointer; }
+.seg span { display: block; text-align: center; padding: 7px 4px; font-size: 12.5px; font-weight: 500; cursor: pointer; border-left: 1px solid var(--line); }
+.seg label:first-child span { border-left: 0; }
+.seg input:checked + span { background: var(--accent); color: var(--accent-ink); }
+.check { display: flex; gap: 8px; align-items: center; font-size: 13px; cursor: pointer; }
+.check input { accent-color: var(--accent); width: 15px; height: 15px; margin: 0; }
+.hint { font-size: 12px; color: var(--muted); margin: 0; }
+.hint.err { color: var(--bad); }
+.hint.warn { color: var(--warn); }
+.mono { font-family: var(--f-mono); font-variant-numeric: tabular-nums; }
+
+button { font: 500 13px var(--f-body); color: var(--ink); background: var(--panel-2); border: 1px solid var(--line); border-radius: 4px;
+  padding: 6px 11px; cursor: pointer; white-space: nowrap; }
+button:hover { border-color: var(--muted); }
+button.primary { background: var(--accent); color: var(--accent-ink); border-color: var(--accent); }
+.btns { display: flex; flex-wrap: wrap; gap: 6px; }
+
+main { display: grid; gap: 16px; min-width: 0; }
+.card { background: var(--panel); border: 1px solid var(--line); border-radius: var(--r); min-width: 0; }
+.card-head { display: flex; flex-wrap: wrap; gap: 8px 14px; align-items: center; padding: 10px 14px; border-bottom: 1px solid var(--line); }
+.card-head h2 { font: 600 15px var(--f-display); margin: 0; letter-spacing: .02em; }
+.tabs { display: flex; gap: 2px; }
+.tabs button { border: 0; background: none; padding: 6px 10px; border-radius: 4px; color: var(--muted); }
+.tabs button[aria-selected=true] { color: var(--ink); background: var(--panel-2); box-shadow: inset 0 -2px 0 var(--accent); }
+.toolbar { display: flex; flex-wrap: wrap; gap: 8px 14px; align-items: center; margin-left: auto; font-size: 12.5px; }
+.toolbar .field { grid-auto-flow: column; align-items: center; gap: 6px; }
+.toolbar input { width: 82px; padding: 4px 6px; }
+.legend { display: flex; flex-wrap: wrap; gap: 6px 16px; padding: 8px 14px 0; font-size: 12.5px; }
+.legend label { display: flex; align-items: center; gap: 6px; cursor: pointer; }
+.sw { width: 18px; height: 3px; border-radius: 2px; display: inline-block; }
+.plot-box { position: relative; padding: 4px 8px 8px; }
+canvas { display: block; width: 100%; height: 440px; cursor: crosshair; touch-action: none; }
+@media (max-width: 600px) { canvas { height: 320px; } }
+.readout { position: absolute; top: 12px; right: 18px; font: 12px var(--f-mono); background: var(--panel); border: 1px solid var(--line);
+  border-radius: 4px; padding: 5px 8px; pointer-events: none; white-space: pre; }
+.plot-foot { display: flex; flex-wrap: wrap; justify-content: space-between; gap: 6px 12px; padding: 0 14px 12px; font-size: 12px; color: var(--muted); }
+
+.metrics { display: grid; grid-template-columns: repeat(auto-fit, minmax(170px, 1fr)); gap: 0; }
+.metric { padding: 12px 14px; border-right: 1px solid var(--line); border-bottom: 1px solid var(--line); display: grid; gap: 2px; }
+.metric .v { font: 500 18px var(--f-mono); font-variant-numeric: tabular-nums; }
+.metric .v small { font-size: 12px; color: var(--muted); }
+.metric .s { font: 12px var(--f-mono); color: var(--muted); }
+
+.tbl-wrap { overflow-x: auto; }
+table { border-collapse: collapse; width: 100%; font-size: 12.5px; }
+th, td { padding: 6px 12px; text-align: right; border-bottom: 1px solid var(--line); white-space: nowrap; font-variant-numeric: tabular-nums; }
+th { font: 600 11px var(--f-display); text-transform: uppercase; letter-spacing: .07em; color: var(--muted); background: var(--panel-2); }
+td { font-family: var(--f-mono); }
+th:first-child, td:first-child { text-align: left; }
+.pill { display: inline-block; padding: 1px 8px; border-radius: 99px; font: 600 11px var(--f-body); }
+.pill.ok { color: var(--good); background: var(--good-bg); }
+.pill.bad { color: var(--bad); background: var(--bad-bg); }
+.summary { display: flex; flex-wrap: wrap; gap: 8px 24px; padding: 12px 14px; font-size: 13px; }
+.summary b { font: 500 15px var(--f-mono); }
+
+.export { display: grid; grid-template-columns: minmax(0, 260px) minmax(0, 1fr); gap: 14px; padding: 14px; }
+@media (max-width: 700px) { .export { grid-template-columns: minmax(0, 1fr); } }
+.fmt-list { display: grid; gap: 6px; align-content: start; }
+.fmt { display: grid; grid-template-columns: auto 1fr; gap: 0 8px; align-items: center; padding: 8px 10px; border: 1px solid var(--line); border-radius: 5px; cursor: pointer; }
+.fmt input { accent-color: var(--accent); margin: 0; }
+.fmt small { grid-column: 2; color: var(--muted); font-size: 11.5px; }
+.fmt:has(input:checked) { border-color: var(--accent); background: var(--panel-2); }
+#exportPreview { min-height: 230px; font-size: 12px; white-space: pre; }
+.status { font-size: 12.5px; min-height: 1.2em; }
+.status.ok { color: var(--good); } .status.err { color: var(--bad); }
+.coef-table td:nth-child(2), .coef-table td:nth-child(3) { min-width: 120px; }
+#impulseNote { padding: 0 14px 12px; }
+.design-bar { position: sticky; bottom: 0; z-index: 2; display: grid; gap: 8px; padding: 12px 16px calc(12px + env(safe-area-inset-bottom, 0px));
+  background: var(--panel); border-top: 1px solid var(--line); box-shadow: 0 -6px 14px -10px rgba(0,0,0,.25); }
+.design-btn { width: 100%; padding: 10px 14px; font-size: 14.5px; font-weight: 600; letter-spacing: .01em; }
+.design-btn.pending { box-shadow: 0 0 0 3px color-mix(in srgb, var(--accent) 30%, transparent); }
+.design-meta { display: flex; flex-wrap: wrap; justify-content: space-between; align-items: center; gap: 6px 12px; }
+.dirty { font-size: 12px; color: var(--warn); }
+@media (prefers-reduced-motion: no-preference) { button, .seg span { transition: background-color .12s, border-color .12s; } }
+</style>
+
+<div class="wrap">
+  <header class="top">
+    <div>
+      <h1>FIR Filter Designer</h1>
+      <p class="sub">Linear-phase FIR design with fixed-point coefficients, ready to load into a DSP or a CMX983-style FIR.</p>
+    </div>
+    <div class="chips" id="chips" aria-live="polite"></div>
+  </header>
+
+  <div class="layout">
+    <aside class="rail" aria-label="Filter settings">
+      <fieldset>
+        <legend>Response type</legend>
+        <div class="seg" role="radiogroup" aria-label="Response type">
+          <label><input type="radio" name="type" id="type-lowpass" value="lowpass" checked><span>Lowpass</span></label>
+          <label><input type="radio" name="type" id="type-highpass" value="highpass"><span>Highpass</span></label>
+          <label><input type="radio" name="type" id="type-bandpass" value="bandpass"><span>Bandpass</span></label>
+          <label><input type="radio" name="type" id="type-bandstop" value="bandstop"><span>Bandstop</span></label>
+        </div>
+      </fieldset>
+
+      <fieldset>
+        <legend>Design method</legend>
+        <label class="field"><span>Method</span>
+          <select id="method">
+            <option value="equiripple">Equiripple (Parks-McClellan)</option>
+            <option value="ls">Least-squares</option>
+            <option value="window">Window</option>
+          </select>
+        </label>
+        <div class="row" id="windowRow" hidden>
+          <label class="field"><span>Window</span>
+            <select id="win">
+              <option value="kaiser">Kaiser</option>
+              <option value="hamming">Hamming</option>
+              <option value="hann">Hann</option>
+              <option value="blackman">Blackman</option>
+              <option value="blackmanharris">Blackman-Harris</option>
+              <option value="rect">Rectangular</option>
+            </select>
+          </label>
+          <label class="field" id="betaField"><span>Kaiser β (blank = auto)</span><input type="number" id="beta" step="0.1" min="0" placeholder="auto"></label>
+        </div>
+      </fieldset>
+
+      <fieldset>
+        <legend>Filter order</legend>
+        <div class="seg two" role="radiogroup" aria-label="Order mode">
+          <label><input type="radio" name="orderMode" id="order-specify" value="specify" checked><span>Specify taps</span></label>
+          <label><input type="radio" name="orderMode" id="order-min" value="minimum"><span>Minimum order</span></label>
+        </div>
+        <label class="field" id="tapsField"><span>Number of taps (order + 1)</span><input type="number" id="taps" min="3" max="2047" step="1" value="125"></label>
+        <p class="hint" id="orderHint"></p>
+      </fieldset>
+
+      <fieldset>
+        <legend>Frequency specifications</legend>
+        <div class="row">
+          <label class="field"><span>Units</span>
+            <select id="units"><option value="1">Hz</option><option value="1000" selected>kHz</option><option value="1000000">MHz</option></select>
+          </label>
+          <label class="field"><span>Sample rate Fs</span><input type="number" id="fs" step="any" min="0" value="90"></label>
+        </div>
+        <div class="row" id="edgesLP">
+          <label class="field"><span id="lblE1">Fpass</span><input type="number" id="e1" step="any" value="1.55"></label>
+          <label class="field"><span id="lblE2">Fstop</span><input type="number" id="e2" step="any" value="5.6"></label>
+        </div>
+        <div class="row" id="edgesBP" hidden>
+          <label class="field"><span id="lblE3">Fstop1</span><input type="number" id="e3" step="any" value="5"></label>
+          <label class="field"><span id="lblE4">Fpass1</span><input type="number" id="e4" step="any" value="8"></label>
+          <label class="field"><span id="lblE5">Fpass2</span><input type="number" id="e5" step="any" value="15"></label>
+          <label class="field"><span id="lblE6">Fstop2</span><input type="number" id="e6" step="any" value="18"></label>
+        </div>
+        <p class="hint" id="freqHint"></p>
+      </fieldset>
+
+      <fieldset id="magSpec">
+        <legend>Magnitude specifications</legend>
+        <div class="row" id="weightsRow">
+          <label class="field"><span id="lblW1">Wpass</span><input type="number" id="wpass" step="any" min="0" value="1"></label>
+          <label class="field"><span id="lblW2">Wstop</span><input type="number" id="wstop" step="any" min="0" value="0.4"></label>
+          <label class="field" id="w3Field" hidden><span id="lblW3">Wstop2</span><input type="number" id="w3" step="any" min="0" value="0.4"></label>
+        </div>
+        <div class="row" id="dbRow" hidden>
+          <label class="field"><span>Apass, passband ripple (dB)</span><input type="number" id="apass" step="any" min="0" value="0.1"></label>
+          <label class="field"><span>Astop, stopband attenuation (dB)</span><input type="number" id="astop" step="any" min="0" value="85"></label>
+        </div>
+        <p class="hint" id="magHint"></p>
+      </fieldset>
+
+      <fieldset>
+        <legend>Fixed-point coefficients</legend>
+        <div class="row">
+          <label class="field"><span>Coefficient width (bits)</span><input type="number" id="bits" min="4" max="32" step="1" value="16"></label>
+          <label class="field"><span>Gain shift S (blank = auto)</span><input type="number" id="shift" min="0" max="40" step="1" placeholder="auto"></label>
+        </div>
+        <label class="field"><span>Scaling</span>
+          <select id="qmode">
+            <option value="gain">Passband gain = 2^S (sum of taps ≈ 2^S, output shifted by S)</option>
+            <option value="q">Q1.(bits−1) fractional</option>
+            <option value="peak">Largest tap = full scale</option>
+          </select>
+        </label>
+        <p class="hint" id="qHint"></p>
+      </fieldset>
+
+      <fieldset>
+        <legend>Compare with existing coefficients</legend>
+        <label class="check"><input type="checkbox" id="refOn" checked> Show reference filter on the plot</label>
+        <label class="field"><span>Reference name</span><input type="text" id="refName" value="Current CMX983 FIR"></label>
+        <label class="field"><span>Coefficients (integers or floats, any separator)</span><textarea id="refCoeffs" spellcheck="false"></textarea></label>
+        <div class="btns">
+          <label class="btn-file"><button type="button" id="refLoadBtn">Load from file…</button><input type="file" id="refFile" accept=".txt,.csv,.coe,.h,.dat" hidden></label>
+          <button type="button" id="refUseDesign">Copy current design here</button>
+        </div>
+        <p class="hint" id="refHint"></p>
+      </fieldset>
+
+      <fieldset>
+        <legend>Adjacent-channel interferer check</legend>
+        <label class="check"><input type="checkbox" id="imOn" checked> Check rejection of an FM interferer</label>
+        <p class="hint">FM test signal (e.g. ETSI A‑M3): audio tone with deviation set as a percentage of channel separation.</p>
+        <div class="row">
+          <label class="field"><span>Interferer offset</span><input type="number" id="imOff" step="any" value="7.5"></label>
+          <label class="field"><span>Channel separation</span><input type="number" id="imCh" step="any" value="7.5"></label>
+          <label class="field"><span>Deviation (% of separation)</span><input type="number" id="imDev" step="any" value="12"></label>
+          <label class="field"><span>Audio tone (Hz)</span><input type="number" id="imTone" step="any" value="400"></label>
+        </div>
+        <div class="row three">
+          <label class="field"><span>ACS target (dB)</span><input type="number" id="imAcs" step="any" value="60"></label>
+          <label class="field"><span>Demod C/I (dB)</span><input type="number" id="imCi" step="any" value="10"></label>
+          <label class="field"><span>Margin (dB)</span><input type="number" id="imMargin" step="any" value="3"></label>
+        </div>
+      </fieldset>
+
+      <fieldset>
+        <div class="btns"><button type="button" id="resetBtn">Reset to CMX983 GMSK defaults</button></div>
+      </fieldset>
+
+      <div class="design-bar">
+        <button type="button" class="primary design-btn" id="designBtn">Design filter</button>
+        <div class="design-meta">
+          <span class="dirty" id="dirtyNote" role="status"></span>
+          <label class="check"><input type="checkbox" id="autoDesign"> Redesign as I type</label>
+        </div>
+      </div>
+    </aside>
+
+    <main>
+      <section class="card" aria-label="Response plot">
+        <div class="card-head">
+          <div class="tabs" role="tablist">
+            <button role="tab" id="tab-mag" aria-selected="true">Magnitude</button>
+            <button role="tab" id="tab-phase" aria-selected="false">Phase</button>
+            <button role="tab" id="tab-gd" aria-selected="false">Group delay</button>
+            <button role="tab" id="tab-imp" aria-selected="false">Impulse response</button>
+          </div>
+          <div class="toolbar" id="magTools">
+            <label class="field"><span>From</span><input type="number" id="xMin" step="any"></label>
+            <label class="field"><span>To</span><input type="number" id="xMax" step="any"></label>
+            <label class="field" id="yMinField"><span>Floor (dB)</span><input type="number" id="yMin" step="10" value="-110"></label>
+            <label class="field" id="phaseField" hidden><span>Phase</span>
+              <select id="phaseMode"><option value="unwrapped">Unwrapped</option><option value="wrapped">Wrapped ±180°</option></select></label>
+            <label class="field" id="gdField" hidden><span>Units</span>
+              <select id="gdUnit"><option value="samples">Samples</option><option value="time">Time</option></select></label>
+            <button type="button" id="zoomFull">Full</button>
+            <button type="button" id="zoomPass">Passband</button>
+            <button type="button" id="clearTips">Clear data tips</button>
+          </div>
+        </div>
+        <div class="legend" id="legend">
+          <label><input type="checkbox" id="showFloat" checked hidden><span class="sw" style="background:var(--accent)"></span>Designed (floating point)</label>
+          <label><input type="checkbox" id="showQ" checked><span class="sw" style="background:var(--trace-q)"></span>Quantised</label>
+          <label id="legRef"><input type="checkbox" id="showRef" checked><span class="sw" style="background:var(--trace-ref)"></span><span id="legRefName">Reference</span></label>
+          <label id="legIm"><span class="sw" style="background:var(--bad);height:8px;width:8px;border-radius:0;clip-path:polygon(0 0,100% 0,50% 100%)"></span>Required attenuation per FM line</label>
+        </div>
+        <div class="plot-box">
+          <canvas id="plot" aria-label="Filter magnitude response"></canvas>
+          <div class="readout" id="readout" hidden></div>
+        </div>
+        <div class="plot-foot">
+          <span>Hover to read values. Click to pin a data tip; click a tip again to remove it.</span>
+          <span id="plotNote"></span>
+        </div>
+      </section>
+
+      <section class="card" aria-label="Design measurements">
+        <div class="card-head"><h2>Measurements</h2><span class="hint" id="measNote"></span></div>
+        <div class="metrics" id="metrics"></div>
+      </section>
+
+      <section class="card" id="imCard" aria-label="Interferer check">
+        <div class="card-head"><h2>FM interferer rejection</h2><span class="hint" id="imNote"></span></div>
+        <div class="summary" id="imSummary"></div>
+        <div class="tbl-wrap"><table id="imTable"></table></div>
+      </section>
+
+      <section class="card" aria-label="Export coefficients">
+        <div class="card-head"><h2>Export coefficients</h2></div>
+        <div class="export">
+          <div class="fmt-list" role="radiogroup" aria-label="Format">
+            <label class="fmt"><input type="radio" name="fmt" id="fmt-int" value="int" checked><span>Integer list (.txt)</span><small>One tap per line, same layout as your CMX983 file</small></label>
+            <label class="fmt"><input type="radio" name="fmt" id="fmt-c" value="c"><span>C array (.txt)</span><small>int16_t / int32_t table with defines</small></label>
+            <label class="fmt"><input type="radio" name="fmt" id="fmt-csv" value="csv"><span>Spreadsheet (.csv)</span><small>Index, floating point, integer</small></label>
+            <label class="fmt"><input type="radio" name="fmt" id="fmt-float" value="float"><span>Floating point (.txt)</span><small>Full precision, one per line</small></label>
+            <label class="fmt"><input type="radio" name="fmt" id="fmt-json" value="json"><span>Design record (.json)</span><small>All settings, taps and measurements</small></label>
+            <div class="btns">
+              <button type="button" class="primary" id="dlBtn">Download</button>
+              <button type="button" id="copyBtn">Copy</button>
+            </div>
+            <div class="status" id="exportStatus" role="status"></div>
+          </div>
+          <textarea id="exportPreview" readonly spellcheck="false" aria-label="Export preview"></textarea>
+        </div>
+      </section>
+    </main>
+  </div>
+</div>
+
+<script>
+/* ---------- FIR design core (no DOM) ---------- */
+const FIR = (() => {
+  const TWO_PI = 2 * Math.PI;
+
+  // Bands in normalised frequency (cycles/sample, 0..0.5): [{lo, hi, d, w}]
+  function bandsFor(spec) {
+    const { type, fs } = spec;
+    const n = f => f / fs;
+    const wp = spec.wpass, ws = spec.wstop, ws2 = spec.wstop2 ?? spec.wstop, wp2 = spec.wpass2 ?? spec.wpass;
+    switch (type) {
+      case "lowpass":  return [{ lo: 0, hi: n(spec.fpass), d: 1, w: wp }, { lo: n(spec.fstop), hi: 0.5, d: 0, w: ws }];
+      case "highpass": return [{ lo: 0, hi: n(spec.fstop), d: 0, w: ws }, { lo: n(spec.fpass), hi: 0.5, d: 1, w: wp }];
+      case "bandpass": return [{ lo: 0, hi: n(spec.fstop1), d: 0, w: ws }, { lo: n(spec.fpass1), hi: n(spec.fpass2), d: 1, w: wp },
+                               { lo: n(spec.fstop2), hi: 0.5, d: 0, w: ws2 }];
+      case "bandstop": return [{ lo: 0, hi: n(spec.fpass1), d: 1, w: wp }, { lo: n(spec.fstop1), hi: n(spec.fstop2), d: 0, w: ws },
+                               { lo: n(spec.fpass2), hi: 0.5, d: 1, w: wp2 }];
+    }
+    throw new Error("Unknown filter type");
+  }
+
+  function validateBands(bands) {
+    let prev = -1;
+    for (const b of bands) {
+      if (!(b.lo >= 0 && b.hi <= 0.5 && b.lo < b.hi)) return "Band edges must increase and stay between 0 and fs/2.";
+      if (b.lo < prev) return "Band edges overlap. Each stopband and passband edge must be above the previous one.";
+      prev = b.hi;
+    }
+    return null;
+  }
+
+  // Dense grid; Q(f) = 1 (odd taps) or cos(pi f) (even taps). Returns arrays.
+  function makeGrid(bands, K, even, density = 20) {
+    const delta = 0.5 / (density * K);
+    const f = [], D = [], W = [];
+    for (const b of bands) {
+      const npts = Math.max(2, Math.round((b.hi - b.lo) / delta) + 1);
+      for (let i = 0; i < npts; i++) {
+        let fr = b.lo + (b.hi - b.lo) * i / (npts - 1);
+        if (even && fr > 0.5 - delta) fr = 0.5 - delta;  // Q(0.5) = 0
+        const q = even ? Math.cos(Math.PI * fr) : 1;
+        f.push(fr); D.push(b.d / q); W.push(b.w * q);
+      }
+    }
+    return { f, D, W };
+  }
+
+  // Convert cosine-series coefficients a_k (P(w) = sum a_k cos kw) to taps
+  function cosToTaps(a, N) {
+    const h = new Float64Array(N);
+    const K = a.length;
+    if (N % 2) {
+      const L = (N - 1) / 2;
+      h[L] = a[0];
+      for (let k = 1; k < K; k++) { h[L - k] = a[k] / 2; h[L + k] = a[k] / 2; }
+    } else {
+      const b = new Float64Array(K + 2);           // b[m] multiplies cos((m - 1/2) w)
+      b[1] += a[0];
+      for (let k = 1; k < K; k++) { b[k + 1] += a[k] / 2; b[k] += a[k] / 2; }
+      const M = N / 2;
+      for (let m = 1; m <= M; m++) { h[M - m] = b[m] / 2; h[M - 1 + m] = b[m] / 2; }
+    }
+    return h;
+  }
+
+  // Parks-McClellan / Remez exchange for symmetric (Type I/II) filters
+  function remez(N, bands) {
+    const even = N % 2 === 0;
+    const K = even ? N / 2 : (N + 1) / 2;          // number of cosine terms
+    const r = K + 1;                                 // number of extremals
+    const { f, D, W } = makeGrid(bands, K, even);
+    const G = f.length;
+    if (G < r) throw new Error("Not enough frequency points. Widen the bands or reduce the taps.");
+    const x = f.map(v => Math.cos(TWO_PI * v));
+    let ext = Array.from({ length: r }, (_, i) => Math.round(i * (G - 1) / (r - 1)));
+    let ad, y, delta = 0, E = new Float64Array(G), iters = 0, converged = false;
+
+    const bary = (xv, xs, ys, ws) => {
+      let num = 0, den = 0;
+      for (let i = 0; i < xs.length; i++) {
+        const dx = xv - xs[i];
+        if (Math.abs(dx) < 1e-14) return ys[i];
+        const c = ws[i] / dx; num += c * ys[i]; den += c;
+      }
+      return num / den;
+    };
+
+    for (iters = 1; iters <= 60; iters++) {
+      const xe = ext.map(i => x[i]);
+      ad = xe.map((xi, i) => {
+        let p = 1;
+        for (let j = 0; j < r; j++) if (j !== i) p *= 2 * (xi - xe[j]);
+        return 1 / p;
+      });
+      let num = 0, den = 0;
+      for (let i = 0; i < r; i++) { num += ad[i] * D[ext[i]]; den += ad[i] * (i % 2 ? -1 : 1) / W[ext[i]]; }
+      delta = num / den;
+      y = ext.map((g, i) => D[g] - (i % 2 ? -1 : 1) * delta / W[g]);
+      for (let g = 0; g < G; g++) E[g] = W[g] * (D[g] - bary(x[g], xe, y, ad));
+
+      // locate local extrema
+      let cand = [];
+      for (let g = 0; g < G; g++) {
+        const e = E[g], l = g > 0 ? E[g - 1] : -Infinity * Math.sign(e), rr = g < G - 1 ? E[g + 1] : -Infinity * Math.sign(e);
+        if (e > 0 && e >= (g > 0 ? l : -Infinity) && e > (g < G - 1 ? rr : -Infinity)) cand.push(g);
+        else if (e < 0 && e <= (g > 0 ? l : Infinity) && e < (g < G - 1 ? rr : Infinity)) cand.push(g);
+      }
+      // enforce alternation
+      const alt = [];
+      for (const g of cand) {
+        if (alt.length && Math.sign(E[alt[alt.length - 1]]) === Math.sign(E[g])) {
+          if (Math.abs(E[g]) > Math.abs(E[alt[alt.length - 1]])) alt[alt.length - 1] = g;
+        } else alt.push(g);
+      }
+      while (alt.length > r) {
+        if (Math.abs(E[alt[0]]) < Math.abs(E[alt[alt.length - 1]])) alt.shift(); else alt.pop();
+      }
+      if (alt.length < r) break;                       // keep previous set
+      const mags = alt.map(g => Math.abs(E[g]));
+      const emax = Math.max(...mags), emin = Math.min(...mags);
+      const same = alt.every((g, i) => g === ext[i]);
+      ext = alt;
+      if (same || (emax - emin) / emax < 1e-6) { converged = true; break; }
+    }
+
+    // Recover cosine coefficients from the final interpolant at Chebyshev nodes (exact DCT)
+    const xe = ext.map(i => x[i]);
+    const yf = ext.map((g, i) => D[g] - (i % 2 ? -1 : 1) * delta / W[g]);
+    const adf = xe.map((xi, i) => { let p = 1; for (let j = 0; j < r; j++) if (j !== i) p *= 2 * (xi - xe[j]); return 1 / p; });
+    const P = [], wn = [];
+    for (let m = 0; m < K; m++) { const w = Math.PI * (m + 0.5) / K; wn.push(w); P.push(bary(Math.cos(w), xe, yf, adf)); }
+    const a = new Float64Array(K);
+    for (let k = 0; k < K; k++) {
+      let s = 0; for (let m = 0; m < K; m++) s += P[m] * Math.cos(k * wn[m]);
+      a[k] = (k === 0 ? 1 : 2) * s / K;
+    }
+    return { h: cosToTaps(a, N), iters, converged, delta: Math.abs(delta) };
+  }
+
+  // Weighted least squares on the same basis
+  function leastSquares(N, bands) {
+    const even = N % 2 === 0;
+    const K = even ? N / 2 : (N + 1) / 2;
+    const { f, D, W } = makeGrid(bands, K, even, 24);
+    const A = Array.from({ length: K }, () => new Float64Array(K)), b = new Float64Array(K);
+    const c = new Float64Array(K);
+    for (let g = 0; g < f.length; g++) {
+      const w = TWO_PI * f[g], w2 = W[g] * W[g];
+      for (let k = 0; k < K; k++) c[k] = Math.cos(k * w);
+      for (let i = 0; i < K; i++) {
+        b[i] += w2 * D[g] * c[i];
+        const Ai = A[i];
+        for (let j = i; j < K; j++) Ai[j] += w2 * c[i] * c[j];
+      }
+    }
+    for (let i = 0; i < K; i++) for (let j = 0; j < i; j++) A[i][j] = A[j][i];
+    return { h: cosToTaps(solve(A, b), N) };
+  }
+
+  function solve(A, b) {                       // Gaussian elimination, partial pivoting
+    const n = b.length, M = A.map((row, i) => [...row, b[i]]);
+    for (let c = 0; c < n; c++) {
+      let p = c; for (let r = c + 1; r < n; r++) if (Math.abs(M[r][c]) > Math.abs(M[p][c])) p = r;
+      [M[c], M[p]] = [M[p], M[c]];
+      for (let r = c + 1; r < n; r++) {
+        const fct = M[r][c] / M[c][c];
+        if (fct) for (let k = c; k <= n; k++) M[r][k] -= fct * M[c][k];
+      }
+    }
+    const xs = new Float64Array(n);
+    for (let r = n - 1; r >= 0; r--) { let s = M[r][n]; for (let k = r + 1; k < n; k++) s -= M[r][k] * xs[k]; xs[r] = s / M[r][r]; }
+    return xs;
+  }
+
+  // ---- window method ----
+  function besselI0(x) { let s = 1, t = 1; for (let k = 1; k < 60; k++) { t *= (x / (2 * k)) ** 2; s += t; if (t < 1e-17 * s) break; } return s; }
+  function kaiserBeta(A) { return A > 50 ? 0.1102 * (A - 8.7) : A >= 21 ? 0.5842 * (A - 21) ** 0.4 + 0.07886 * (A - 21) : 0; }
+  function windowFn(name, N, beta) {
+    const w = new Float64Array(N), M = N - 1;
+    for (let n = 0; n < N; n++) {
+      const t = M === 0 ? 0 : n / M, c = Math.cos;
+      switch (name) {
+        case "kaiser": w[n] = besselI0(beta * Math.sqrt(1 - (2 * t - 1) ** 2)) / besselI0(beta); break;
+        case "hamming": w[n] = 0.54 - 0.46 * c(TWO_PI * t); break;
+        case "hann": w[n] = 0.5 - 0.5 * c(TWO_PI * t); break;
+        case "blackman": w[n] = 0.42 - 0.5 * c(TWO_PI * t) + 0.08 * c(2 * TWO_PI * t); break;
+        case "blackmanharris": w[n] = 0.35875 - 0.48829 * c(TWO_PI * t) + 0.14128 * c(2 * TWO_PI * t) - 0.01168 * c(3 * TWO_PI * t); break;
+        default: w[n] = 1;
+      }
+    }
+    return w;
+  }
+  function windowDesign(N, spec, winName, beta) {
+    const fs = spec.fs, M = (N - 1) / 2;
+    const lp = fc => Array.from({ length: N }, (_, n) => { const m = n - M; return m === 0 ? 2 * fc : Math.sin(TWO_PI * fc * m) / (Math.PI * m); });
+    const imp = n => (n === M ? 1 : 0);
+    let hd, fRef;
+    const mid = (a, b) => (a + b) / 2 / fs;
+    switch (spec.type) {
+      case "lowpass": hd = lp(mid(spec.fpass, spec.fstop)); fRef = 0; break;
+      case "highpass": { const l = lp(mid(spec.fstop, spec.fpass)); hd = l.map((v, n) => imp(n) - v); fRef = 0.5; break; }
+      case "bandpass": { const a = lp(mid(spec.fstop1, spec.fpass1)), b = lp(mid(spec.fpass2, spec.fstop2)); hd = b.map((v, n) => v - a[n]);
+        fRef = (spec.fpass1 + spec.fpass2) / 2 / fs; break; }
+      case "bandstop": { const a = lp(mid(spec.fpass1, spec.fstop1)), b = lp(mid(spec.fstop2, spec.fpass2)); hd = a.map((v, n) => imp(n) - (b[n] - v)); fRef = 0; break; }
+    }
+    const w = windowFn(winName, N, beta);
+    const h = Float64Array.from(hd, (v, n) => v * w[n]);
+    const g = Math.abs(response(h, [fRef])[0]);       // unity gain at passband reference
+    return { h: h.map(v => v / g), fRef };
+  }
+
+  // ---- analysis ----
+  function response(h, fNorm) {                      // complex magnitude |H| at normalised freqs
+    return fNorm.map(f => {
+      let re = 0, im = 0; const w = TWO_PI * f;
+      for (let n = 0; n < h.length; n++) { re += h[n] * Math.cos(w * n); im -= h[n] * Math.sin(w * n); }
+      return Math.hypot(re, im);
+    });
+  }
+  const toDb = v => 20 * Math.log10(Math.max(v, 1e-12));
+
+  function passbandRef(spec) {
+    switch (spec.type) {
+      case "lowpass": case "bandstop": return 0;
+      case "highpass": return 0.5;
+      case "bandpass": return (spec.fpass1 + spec.fpass2) / 2 / spec.fs;
+    }
+  }
+
+  function metrics(h, spec, bands, nPts = 4096) {
+    const fs = spec.fs;
+    const f = Array.from({ length: nPts }, (_, i) => 0.5 * i / (nPts - 1));
+    const H = response(h, f).map(toDb);
+    let pMax = -Infinity, pMin = Infinity, sMax = -Infinity;
+    for (const b of bands) for (let i = 0; i < nPts; i++) if (f[i] >= b.lo - 1e-12 && f[i] <= b.hi + 1e-12) {
+      if (b.d) { pMax = Math.max(pMax, H[i]); pMin = Math.min(pMin, H[i]); } else sMax = Math.max(sMax, H[i]);
+    }
+    // -3 / -6 dB edges: crossings nearest to the passband
+    const crossings = lvl => {
+      const out = [];
+      for (let i = 1; i < nPts; i++) if ((H[i - 1] - lvl) * (H[i] - lvl) < 0 && Math.max(H[i - 1], H[i]) > -40) {
+        const t = (lvl - H[i - 1]) / (H[i] - H[i - 1]);
+        out.push((f[i - 1] + t * (f[i] - f[i - 1])) * fs);
+      }
+      return out;
+    };
+    return { f: f.map(v => v * fs), H, ripple: pMax - pMin, stopAtt: -sMax, cross3: crossings(-3), cross6: crossings(-6) };
+  }
+
+  // ---- quantisation ----
+  function quantise(h, spec, bits, mode, shiftIn) {
+    const full = 2 ** (bits - 1) - 1;
+    const g = Math.abs(response(h, [passbandRef(spec)])[0]) || 1;
+    const hn = Array.from(h, v => v / g);           // passband gain 1
+    const peak = Math.max(...hn.map(Math.abs));
+    let scale, shift = null;
+    if (mode === "gain") {
+      shift = shiftIn === "" || shiftIn == null || isNaN(shiftIn) ? Math.floor(Math.log2(full / peak)) : Number(shiftIn);
+      scale = 2 ** shift;
+    } else if (mode === "q") scale = 2 ** (bits - 1);
+    else scale = full / peak;
+    const q = hn.map(v => Math.round(v * scale));
+    const clipped = q.some(v => v > full || v < -full - 1);
+    const qc = q.map(v => Math.max(-full - 1, Math.min(full, v)));
+    return { ints: qc, scale, shift, clipped, hq: qc.map(v => v / scale), sum: qc.reduce((a, b) => a + b, 0),
+             sumAbs: qc.reduce((a, b) => a + Math.abs(b), 0), maxAbs: Math.max(...qc.map(Math.abs)) };
+  }
+
+  // ---- order estimate (Herrmann / Kaiser) ----
+  function estimateTaps(spec, bands, apass, astop) {
+    const dp = (10 ** (apass / 20) - 1) / (10 ** (apass / 20) + 1), ds = 10 ** (-astop / 20);
+    let tw = Infinity;
+    for (let i = 1; i < bands.length; i++) tw = Math.min(tw, bands[i].lo - bands[i - 1].hi);
+    const Dinf = (0.005309 * Math.log10(dp) ** 2 + 0.07114 * Math.log10(dp) - 0.4761) * Math.log10(ds)
+      - (0.00266 * Math.log10(dp) ** 2 + 0.5941 * Math.log10(dp) + 0.4278);
+    const F = 11.01217 + 0.51244 * (Math.log10(dp) - Math.log10(ds));
+    return { taps: Math.max(3, Math.ceil(Dinf / tw - F * tw) + 1), dp, ds };
+  }
+
+  // ---- FM interferer (A-M3) ----
+  function besselJ(n, x) {
+    n = Math.abs(n);
+    let s = 0, t = (x / 2) ** n; for (let k = 1; k <= n; k++) t /= k;
+    for (let k = 0; k < 80; k++) { if (k > 0) t *= -(x * x / 4) / (k * (k + n)); s += t; if (Math.abs(t) < 1e-18) break; }
+    return s;
+  }
+
+  return { bandsFor, validateBands, remez, leastSquares, windowDesign, kaiserBeta, response, toDb, metrics, quantise,
+           estimateTaps, besselJ, passbandRef };
+})();
+
+
+</script>
+<script>
+(() => {
+const $ = id => document.getElementById(id);
+const CMX983 = [-3,4,7,11,17,24,30,35,38,38,32,20,1,-26,-60,-100,-143,-186,-225,-253,-266,-257,-223,-158,-63,63,215,386,565,738,889,999,1052,1030,920,712,404,1,-484,-1028,-1600,-2162,-2666,-3064,-3304,-3338,-3121,-2619,-1808,-679,759,2483,4450,6602,8867,11163,13400,15488,17338,18870,20016,20726,20966,20726,20016,18870,17338,15488,13400,11163,8867,6602,4450,2483,759,-679,-1808,-2619,-3121,-3338,-3304,-3064,-2666,-2162,-1600,-1028,-484,1,404,712,920,1030,1052,999,889,738,565,386,215,63,-63,-158,-223,-257,-266,-253,-225,-186,-143,-100,-60,-26,1,20,32,38,38,35,30,24,17,11,7,4,-3];
+
+const STORE_KEY = "fir-designer-v1";
+const FIELD_IDS = ["method","win","beta","taps","units","fs","e1","e2","e3","e4","e5","e6","wpass","wstop","w3","apass","astop",
+  "bits","shift","qmode","refOn","refName","refCoeffs","imOn","imOff","imCh","imDev","imTone","imAcs","imCi","imMargin","yMin","showQ","showRef","phaseMode","gdUnit","autoDesign"];
+const RADIO = ["type","orderMode","fmt"];
+const DEFAULTS = {};
+
+let state = { design: null, view: { x0: null, x1: null }, tips: [], tab: "mag", hover: null };
+
+/* ---------- persistence ---------- */
+function snapshot() {
+  const o = {};
+  for (const id of FIELD_IDS) { const el = $(id); o[id] = el.type === "checkbox" ? el.checked : el.value; }
+  for (const n of RADIO) o[n] = document.querySelector(`input[name=${n}]:checked`).value;
+  return o;
+}
+function apply(o) {
+  for (const id of FIELD_IDS) if (id in o) { const el = $(id); if (el.type === "checkbox") el.checked = !!o[id]; else el.value = o[id]; }
+  for (const n of RADIO) if (o[n]) { const r = document.querySelector(`input[name=${n}][value="${o[n]}"]`); if (r) r.checked = true; }
+}
+function save() { try { localStorage.setItem(STORE_KEY, JSON.stringify(snapshot())); } catch (e) {} }
+function load() { try { const s = localStorage.getItem(STORE_KEY); if (s) apply(JSON.parse(s)); } catch (e) {} }
+
+/* ---------- helpers ---------- */
+const U = () => Number($("units").value);
+const uName = () => ({ 1: "Hz", 1000: "kHz", 1000000: "MHz" })[$("units").value];
+const num = id => { const v = $(id).value.trim(); return v === "" ? NaN : Number(v); };
+const fmtF = hz => { const u = U(); const v = hz / u; const d = u === 1 ? 1 : u === 1000 ? 4 : 6; return `${(+v.toFixed(d)).toString()} ${uName()}`; };
+const fmtDb = v => (isFinite(v) ? v.toFixed(2) : "—");
+const getType = () => document.querySelector("input[name=type]:checked").value;
+const getOrderMode = () => document.querySelector("input[name=orderMode]:checked").value;
+const needsOdd = t => t === "highpass" || t === "bandstop";
+
+function parseCoeffs(text) {
+  const vals = (text.match(/[-+]?(?:\d+\.?\d*|\.\d+)(?:[eE][-+]?\d+)?/g) || []).map(Number).filter(v => isFinite(v));
+  return vals;
+}
+
+function readSpec() {
+  const type = getType(), u = U();
+  const spec = { type, fs: num("fs") * u, wpass: num("wpass"), wstop: num("wstop") };
+  if (type === "lowpass") { spec.fpass = num("e1") * u; spec.fstop = num("e2") * u; }
+  else if (type === "highpass") { spec.fstop = num("e1") * u; spec.fpass = num("e2") * u; }
+  else if (type === "bandpass") { spec.fstop1 = num("e3") * u; spec.fpass1 = num("e4") * u; spec.fpass2 = num("e5") * u; spec.fstop2 = num("e6") * u; spec.wstop2 = num("w3"); }
+  else { spec.fpass1 = num("e3") * u; spec.fstop1 = num("e4") * u; spec.fstop2 = num("e5") * u; spec.fpass2 = num("e6") * u; spec.wpass2 = num("w3"); }
+  return spec;
+}
+
+/* ---------- UI visibility & labels ---------- */
+function syncForm() {
+  const type = getType(), method = $("method").value, om = getOrderMode();
+  const bp = type === "bandpass" || type === "bandstop";
+  $("edgesLP").hidden = bp; $("edgesBP").hidden = !bp;
+  $("lblE1").textContent = (type === "highpass" ? "Fstop" : "Fpass") + ` (${uName()})`;
+  $("lblE2").textContent = (type === "highpass" ? "Fpass" : "Fstop") + ` (${uName()})`;
+  const n4 = type === "bandpass" ? ["Fstop1", "Fpass1", "Fpass2", "Fstop2"] : ["Fpass1", "Fstop1", "Fstop2", "Fpass2"];
+  ["lblE3", "lblE4", "lblE5", "lblE6"].forEach((id, i) => $(id).textContent = `${n4[i]} (${uName()})`);
+  $("windowRow").hidden = method !== "window";
+  $("betaField").hidden = $("win").value !== "kaiser";
+  $("tapsField").hidden = om === "minimum";
+  const useDb = om === "minimum" || method === "window";
+  $("weightsRow").hidden = om === "minimum" || method === "window";
+  $("dbRow").hidden = !useDb;
+  $("w3Field").hidden = !bp;
+  $("lblW3").textContent = type === "bandpass" ? "Wstop2" : "Wpass2";
+  $("lblW1").textContent = type === "bandstop" ? "Wpass1" : "Wpass";
+  $("lblW2").textContent = type === "bandpass" ? "Wstop1" : "Wstop";
+  $("imCard").hidden = !$("imOn").checked;
+  $("legIm").hidden = !$("imOn").checked || state.tab !== "mag";
+  const refOn = $("refOn").checked;
+  $("legRef").hidden = !refOn;
+  $("legRefName").textContent = $("refName").value || "Reference";
+  $("magHint").textContent = om === "minimum" ? "The designer searches for the fewest taps that meet both targets."
+    : method === "window" ? "Window designs have no weights. Astop sets Kaiser β when β is blank; cutoff is midway through each transition band."
+    : "Weights set the ripple trade-off: raise Wstop for more stopband attenuation, raise Wpass for flatter passband.";
+}
+
+/* ---------- design ---------- */
+function designAt(N, spec, bands, method, opts) {
+  if (method === "equiripple") return FIR.remez(N, bands);
+  if (method === "ls") return FIR.leastSquares(N, bands);
+  const beta = opts.beta;
+  return FIR.windowDesign(N, spec, opts.win, beta);
+}
+
+function runDesign() {
+  const spec = readSpec(), method = $("method").value, om = getOrderMode(), type = spec.type;
+  const errors = [], notes = [];
+  if (!(spec.fs > 0)) errors.push("Enter a sample rate above zero.");
+  const edges = ["fpass","fstop","fstop1","fpass1","fpass2","fstop2"].filter(k => k in spec).map(k => spec[k]);
+  if (edges.some(v => !isFinite(v))) errors.push("Fill in every band edge.");
+  if (!errors.length && edges.some(v => v <= 0 || v >= spec.fs / 2)) errors.push(`Band edges must lie between 0 and Fs/2 (${fmtF(spec.fs / 2)}).`);
+  let bands = null;
+  if (!errors.length) {
+    const apass = num("apass"), astop = num("astop");
+    if (om === "minimum") {
+      if (!(apass > 0) || !(astop > 0)) errors.push("Enter Apass and Astop above zero for minimum-order design.");
+      else {
+        const dp = (10 ** (apass / 20) - 1) / (10 ** (apass / 20) + 1), ds = 10 ** (-astop / 20);
+        spec.wpass = 1; spec.wstop = dp / ds; spec.wstop2 = dp / ds; spec.wpass2 = 1;
+      }
+    } else if (method !== "window") {
+      for (const k of ["wpass", "wstop", "wstop2", "wpass2"]) if (k in spec && !(spec[k] > 0)) errors.push("Weights must be above zero.");
+    }
+    bands = FIR.bandsFor(spec);
+    const bErr = FIR.validateBands(bands); if (bErr) errors.push(bErr);
+  }
+  if (errors.length) { state.design = { errors }; return; }
+
+  const winName = $("win").value;
+  const astop = num("astop"), apass = num("apass");
+  const betaIn = num("beta");
+  const beta = isFinite(betaIn) ? betaIn : FIR.kaiserBeta(isFinite(astop) ? astop : 60);
+  const opts = { win: winName, beta };
+
+  let N, res, t0 = performance.now(), search = null;
+  const est = FIR.estimateTaps(spec, bands, isFinite(apass) && apass > 0 ? apass : 0.1, isFinite(astop) && astop > 0 ? astop : 60);
+  if (om === "specify") {
+    N = Math.round(num("taps"));
+    if (!(N >= 3 && N <= 2047)) { state.design = { errors: ["Taps must be between 3 and 2047."] }; return; }
+    if (needsOdd(type) && N % 2 === 0) { N += 1; notes.push(`${type === "highpass" ? "Highpass" : "Bandstop"} filters need an odd number of taps, so ${N} taps are used.`); }
+    try { res = designAt(N, spec, bands, method, opts); } catch (e) { state.design = { errors: [e.message] }; return; }
+  } else {
+    // minimum order search
+    let start = method === "window" && winName === "kaiser"
+      ? Math.max(3, Math.ceil((astop - 7.95) / (14.36 * Math.min(...bands.slice(1).map((b, i) => b.lo - bands[i].hi)))) + 1)
+      : method === "window" ? Math.max(3, Math.round(est.taps * 0.6)) : Math.max(3, est.taps - 12);
+    if (method === "window" && winName === "kaiser" && !isFinite(betaIn)) opts.beta = FIR.kaiserBeta(astop);
+    const step = needsOdd(type) ? 2 : 1;
+    if (step === 2 && start % 2 === 0) start += 1;
+    // step down while the estimate already meets spec
+    const meets = (h) => { const m = FIR.metrics(h, spec, bands, 2048); return m.ripple <= apass + 1e-9 && m.stopAtt >= astop - 1e-9; };
+    N = start; let tries = 0, found = false;
+    const WIN_LIMIT = { rect: 21, hann: 44, hamming: 53, blackman: 74, blackmanharris: 92 };
+    if (method === "window" && WIN_LIMIT[winName] && astop > WIN_LIMIT[winName]) {
+      state.design = { errors: [`The ${$("win").selectedOptions[0].text} window reaches only about ${WIN_LIMIT[winName]} dB stopband attenuation at any length. Lower Astop, or use Kaiser or equiripple.`] };
+      return;
+    }
+    try {
+      res = designAt(N, spec, bands, method, opts);
+      if (meets(res.h)) {
+        while (N - step >= 3) { const r2 = designAt(N - step, spec, bands, method, opts); if (!meets(r2.h)) break; N -= step; res = r2; if (++tries > 400) break; }
+        found = true;
+      } else {
+        while (N < 2047 && tries < 600) { N += step; res = designAt(N, spec, bands, method, opts); tries++; if (meets(res.h)) { found = true; break; }
+          if (performance.now() - t0 > 6000) break; }
+      }
+    } catch (e) { state.design = { errors: [e.message] }; return; }
+    search = { found, N };
+    if (!found) notes.push(method === "window" && winName !== "kaiser"
+      ? `The ${$("win").selectedOptions[0].text} window cannot reach ${astop} dB at any length. Use Kaiser or Blackman-Harris, or equiripple.`
+      : `No length up to ${N} taps met both targets. Relax Apass or Astop, or widen the transition band.`);
+  }
+  const h = Float64Array.from(res.h);
+  const m = FIR.metrics(h, spec, bands, 4096);
+  const bits = Math.round(num("bits"));
+  const q = FIR.quantise(h, spec, isFinite(bits) ? Math.min(32, Math.max(4, bits)) : 16, $("qmode").value, $("shift").value.trim() === "" ? null : num("shift"));
+  const mq = FIR.metrics(Float64Array.from(q.hq), spec, bands, 4096);
+  if (res.converged === false) notes.push("Equiripple iterations did not fully converge. The response is still usable; try fewer taps or wider bands.");
+  state.design = { spec, bands, method, om, N, h, m, q, mq, est, search, notes, errors: [], iters: res.iters, beta: method === "window" && winName === "kaiser" ? opts.beta : null, ms: performance.now() - t0 };
+}
+
+/* ---------- reference ---------- */
+function refInfo(spec, bands) {
+  if (!$("refOn").checked) return null;
+  const c = parseCoeffs($("refCoeffs").value);
+  if (c.length < 3) return { error: "Paste at least 3 coefficients to compare." };
+  const g = Math.abs(FIR.response(c, [FIR.passbandRef(spec)])[0]);
+  if (!(g > 0)) return { error: "Reference has zero gain in the passband." };
+  const h = c.map(v => v / g);
+  const m = bands ? FIR.metrics(h, spec, bands, 4096) : null;
+  const sym = c.every((v, i) => Math.abs(v - c[c.length - 1 - i]) < 1e-12);
+  return { h, raw: c, gain: g, m, sym };
+}
+
+/* ---------- plotting ---------- */
+const cv = $("plot"), ctx = cv.getContext("2d");
+function css(name) { return getComputedStyle(document.documentElement).getPropertyValue(name).trim(); }
+const PAD = { l: 62, r: 14, t: 14, b: 38 };
+function niceStep(range, target) {
+  const raw = range / target, p = 10 ** Math.floor(Math.log10(raw)), n = raw / p;
+  return (n < 1.5 ? 1 : n < 3 ? 2 : n < 7 ? 5 : 10) * p;
+}
+function plotGeom() {
+  const r = cv.getBoundingClientRect(), dpr = window.devicePixelRatio || 1;
+  if (cv.width !== Math.round(r.width * dpr) || cv.height !== Math.round(r.height * dpr)) { cv.width = Math.round(r.width * dpr); cv.height = Math.round(r.height * dpr); }
+  ctx.setTransform(dpr, 0, 0, dpr, 0, 0);
+  return { W: r.width, H: r.height, pw: r.width - PAD.l - PAD.r, ph: r.height - PAD.t - PAD.b };
+}
+function viewX() {
+  const d = state.design, fsH = d && d.spec ? d.spec.fs / 2 : 45000;
+  let x0 = state.view.x0 ?? 0, x1 = state.view.x1 ?? fsH;
+  x0 = Math.max(0, Math.min(x0, fsH)); x1 = Math.max(x0 + 1e-9, Math.min(x1, fsH));
+  return [x0, x1];
+}
+
+// Complex frequency response: magnitude (dB), phase (deg, wrapped), group delay (samples)
+function freqResp(h, fn) {
+  const P = fn.length, mag = new Float64Array(P), ph = new Float64Array(P), gd = new Float64Array(P);
+  for (let i = 0; i < P; i++) {
+    const w = 2 * Math.PI * fn[i];
+    let hr = 0, hi = 0, gr = 0, gi = 0;
+    for (let n = 0; n < h.length; n++) {
+      const c = Math.cos(w * n), s = Math.sin(w * n), v = h[n];
+      hr += v * c; hi -= v * s; gr += n * v * c; gi -= n * v * s;
+    }
+    const p2 = hr * hr + hi * hi;
+    mag[i] = FIR.toDb(Math.sqrt(p2));
+    ph[i] = Math.atan2(hi, hr) * 180 / Math.PI;
+    gd[i] = p2 > 1e-24 ? (gr * hr + gi * hi) / p2 : NaN;
+  }
+  return { mag, ph, gd };
+}
+function unwrapDeg(a) {
+  const out = Float64Array.from(a); let off = 0;
+  for (let i = 1; i < a.length; i++) { const dlt = a[i] - a[i - 1]; if (dlt > 180) off -= 360; else if (dlt < -180) off += 360; out[i] = a[i] + off; }
+  return out;
+}
+
+const TAB_INFO = {
+  mag: { y: "Magnitude (dB)" },
+  phase: { y: () => $("phaseMode").value === "unwrapped" ? "Phase (degrees, unwrapped)" : "Phase (degrees)" },
+  gd: { y: () => $("gdUnit").value === "time" ? `Group delay (${gdTimeUnit().name})` : "Group delay (samples)" }
+};
+function gdTimeUnit() {
+  const d = state.design, s = d && d.spec ? (d.N - 1) / 2 / d.spec.fs : 1e-3;
+  return s >= 1e-3 ? { k: 1e3, name: "ms" } : { k: 1e6, name: "µs" };
+}
+
+let cached = null;
+function curves() {
+  const d = state.design; if (!d || !d.h) return [];
+  const [x0, x1] = viewX(), P = 1400, fs = d.spec.fs;
+  const fr = Array.from({ length: P }, (_, i) => x0 + (x1 - x0) * i / (P - 1));
+  const fn = fr.map(f => f / fs);
+  const src = [{ key: "float", name: "Designed", color: css("--accent"), h: d.h, width: 1.6 }];
+  if ($("showQ").checked) src.push({ key: "q", name: "Quantised", color: css("--trace-q"), h: d.q.hq, width: 1.2, dash: [5, 3] });
+  if (d.ref && d.ref.h && $("showRef").checked) src.push({ key: "ref", name: $("refName").value || "Reference", color: css("--trace-ref"), h: d.ref.h, width: 1.3 });
+  const tab = state.tab, unwrap = $("phaseMode").value === "unwrapped", gdTime = $("gdUnit").value === "time";
+  return src.map(c => {
+    const r = freqResp(c.h, fn);
+    let y;
+    if (tab === "mag") y = r.mag;
+    else if (tab === "phase") y = unwrap ? unwrapDeg(r.ph) : r.ph;
+    else y = gdTime ? r.gd.map(v => v / fs * gdTimeUnit().k) : r.gd;
+    return { ...c, f: fr, y };
+  });
+}
+
+function yRangeFor(tab, cs) {
+  if (tab === "mag") return [isFinite(num("yMin")) ? num("yMin") : -110, 5];
+  const d = state.design;
+  if (tab === "phase" && $("phaseMode").value === "wrapped") return [-180, 180];
+  // auto-range on passband points only (group delay spikes at stopband zeros would swamp the scale)
+  const pb = d.bands.filter(b => b.d);
+  const inPass = f => pb.some(b => f >= b.lo * d.spec.fs && f <= b.hi * d.spec.fs);
+  let lo = Infinity, hi = -Infinity;
+  for (const c of cs) c.f.forEach((f, i) => { const v = c.y[i]; if (isFinite(v) && (tab === "phase" || inPass(f))) { lo = Math.min(lo, v); hi = Math.max(hi, v); } });
+  if (!isFinite(lo)) { lo = 0; hi = 1; }
+  if (tab === "gd") { const span = Math.max(hi - lo, Math.abs(hi) * 0.2, 1e-9); return [lo - span * 0.6, hi + span * 0.6]; }
+  const span = Math.max(hi - lo, 10); return [lo - span * 0.05, hi + span * 0.05];
+}
+
+function draw() {
+  const g = plotGeom(); ctx.clearRect(0, 0, g.W, g.H);
+  const d = state.design;
+  ctx.font = `11px ${css("--f-mono")}`;
+  if (!d || !d.h) { ctx.fillStyle = css("--muted"); ctx.fillText(d && d.errors ? d.errors[0] : "Press Design to create a filter", PAD.l, PAD.t + 20); return; }
+  if (state.tab === "imp") return drawImpulse(g);
+  const tab = state.tab;
+  const [x0, x1] = viewX();
+  cached = curves();
+  const [yMin, yMax] = yRangeFor(tab, cached);
+  const X = f => PAD.l + (f - x0) / (x1 - x0) * g.pw;
+  const Y = v => PAD.t + (yMax - Math.max(yMin - (yMax - yMin), Math.min(yMax + (yMax - yMin), v))) / (yMax - yMin) * g.ph;
+  const u = U();
+  // grid and axes
+  ctx.strokeStyle = css("--grid"); ctx.lineWidth = 1; ctx.fillStyle = css("--muted");
+  const xs = niceStep((x1 - x0) / u, 10) * u;
+  ctx.textAlign = "center";
+  for (let f = Math.ceil(x0 / xs) * xs; f <= x1 + 1e-9; f += xs) { const x = X(f); ctx.beginPath(); ctx.moveTo(x, PAD.t); ctx.lineTo(x, PAD.t + g.ph); ctx.stroke();
+    ctx.fillText(+(f / u).toPrecision(6), x, PAD.t + g.ph + 15); }
+  ctx.fillText(`Frequency (${uName()})`, PAD.l + g.pw / 2, PAD.t + g.ph + 32);
+  ctx.textAlign = "right";
+  const ys = tab === "phase" && $("phaseMode").value === "wrapped" ? 45 : niceStep(yMax - yMin, 8);
+  const yd = ys >= 1 ? 0 : Math.min(6, Math.ceil(-Math.log10(ys)));
+  for (let v = Math.ceil(yMin / ys) * ys; v <= yMax + 1e-9; v += ys) { const y = Y(v); ctx.beginPath(); ctx.moveTo(PAD.l, y); ctx.lineTo(PAD.l + g.pw, y); ctx.stroke(); ctx.fillText(v.toFixed(yd), PAD.l - 6, y + 4); }
+  const yLabel = typeof TAB_INFO[tab].y === "function" ? TAB_INFO[tab].y() : TAB_INFO[tab].y;
+  ctx.save(); ctx.translate(13, PAD.t + g.ph / 2); ctx.rotate(-Math.PI / 2); ctx.textAlign = "center"; ctx.fillText(yLabel, 0, 0); ctx.restore();
+  ctx.strokeStyle = css("--line"); ctx.strokeRect(PAD.l, PAD.t, g.pw, g.ph);
+  // band shading
+  ctx.save(); ctx.beginPath(); ctx.rect(PAD.l, PAD.t, g.pw, g.ph); ctx.clip();
+  ctx.fillStyle = css("--accent"); ctx.globalAlpha = 0.06;
+  for (const b of d.bands) if (b.d) { const a = X(b.lo * d.spec.fs), c = X(b.hi * d.spec.fs); ctx.fillRect(a, PAD.t, c - a, g.ph); }
+  ctx.globalAlpha = 1;
+  if (tab === "mag" && d.om === "minimum" && isFinite(num("astop"))) {
+    ctx.strokeStyle = css("--muted"); ctx.setLineDash([2, 3]);
+    for (const b of d.bands) if (!b.d) { ctx.beginPath(); ctx.moveTo(X(b.lo * d.spec.fs), Y(-num("astop"))); ctx.lineTo(X(b.hi * d.spec.fs), Y(-num("astop"))); ctx.stroke(); }
+    ctx.setLineDash([]);
+  }
+  for (const c of cached) {
+    ctx.strokeStyle = c.color; ctx.lineWidth = c.width; ctx.setLineDash(c.dash || []); ctx.beginPath();
+    let pen = false;
+    c.f.forEach((f, i) => { const v = c.y[i]; if (!isFinite(v)) { pen = false; return; } const x = X(f), y = Y(v); pen ? ctx.lineTo(x, y) : ctx.moveTo(x, y); pen = true; });
+    ctx.stroke();
+  }
+  ctx.setLineDash([]);
+  if (tab === "mag" && d.im && d.im.lines) {
+    ctx.fillStyle = css("--bad");
+    for (const l of d.im.lines) {
+      if (l.f < x0 || l.f > x1 || l.need <= 0) continue;
+      const x = X(l.f), y = Y(-l.need); ctx.beginPath(); ctx.moveTo(x - 4.5, y - 7); ctx.lineTo(x + 4.5, y - 7); ctx.lineTo(x, y); ctx.closePath(); ctx.fill();
+    }
+  }
+  state.geom = { X, Y, x0, x1, g, yMin, yMax, tab };
+  for (const t of state.tips) if (t.tab === tab) drawTip(t, X, Y, g);
+  if (state.hover && state.hover.x >= PAD.l && state.hover.x <= PAD.l + g.pw) {
+    ctx.strokeStyle = css("--muted"); ctx.globalAlpha = .5; ctx.beginPath(); ctx.moveTo(state.hover.x, PAD.t); ctx.lineTo(state.hover.x, PAD.t + g.ph); ctx.stroke(); ctx.globalAlpha = 1;
+  }
+  ctx.restore();
+}
+// value of a plotted curve at frequency f (interpolated from the drawn points)
+function evalY(key, f) {
+  const c = (cached || []).find(c => c.key === key); if (!c) return NaN;
+  const n = c.f.length, x0 = c.f[0], x1 = c.f[n - 1];
+  const t = (f - x0) / (x1 - x0) * (n - 1); if (t < 0 || t > n - 1) return NaN;
+  const i = Math.min(n - 2, Math.floor(t)), a = t - i;
+  return c.y[i] * (1 - a) + c.y[i + 1] * a;
+}
+function evalDb(key, f) {          // exact magnitude, used by the interferer check
+  const d = state.design, fn = [f / d.spec.fs];
+  const h = key === "q" ? d.q.hq : key === "ref" ? d.ref?.h : d.h;
+  return h ? FIR.toDb(FIR.response(h, fn)[0]) : NaN;
+}
+function yUnit() {
+  return state.tab === "mag" ? "dB" : state.tab === "phase" ? "°" : $("gdUnit").value === "time" ? gdTimeUnit().name : "samples";
+}
+function tipLabel() { return state.tab === "mag" ? "Magnitude" : state.tab === "phase" ? "Phase" : "Group delay"; }
+function drawTip(t, X, Y, g) {
+  const [vx0, vx1] = viewX(); if (t.f < vx0 || t.f > vx1) return;
+  const v = evalY(t.key, t.f); if (!isFinite(v)) return;
+  const x = X(t.f), y = Y(v);
+  ctx.fillStyle = css("--ink"); ctx.beginPath(); ctx.arc(x, y, 3.5, 0, 2 * Math.PI); ctx.fill();
+  const lines = [`Frequency  ${(t.f / U()).toFixed(6)}`, `${tipLabel().padEnd(10)} ${v.toFixed(state.tab === "mag" ? 6 : 4)}`];
+  ctx.font = `11px ${css("--f-mono")}`;
+  const w = Math.max(...lines.map(s => ctx.measureText(s).width)) + 12, hh = 34;
+  let bx = x + 8, by = y - hh - 6;
+  if (bx + w > PAD.l + g.pw) bx = x - w - 8; if (by < PAD.t) by = y + 8;
+  ctx.fillStyle = css("--panel"); ctx.strokeStyle = css("--muted"); ctx.lineWidth = 1;
+  ctx.fillRect(bx, by, w, hh); ctx.strokeRect(bx, by, w, hh);
+  ctx.fillStyle = css("--ink"); ctx.textAlign = "left";
+  ctx.fillText(lines[0], bx + 6, by + 14); ctx.fillText(lines[1], bx + 6, by + 28);
+}
+function drawImpulse(g) {
+  const d = state.design, h = d.q.ints, N = h.length;
+  const mx = Math.max(...h.map(Math.abs)) || 1;
+  const X = n => PAD.l + (n + 0.5) / N * g.pw, Y = v => PAD.t + g.ph / 2 - v / mx * (g.ph / 2 - 6);
+  ctx.strokeStyle = css("--grid"); ctx.fillStyle = css("--muted"); ctx.textAlign = "right";
+  for (const v of [-1, -0.5, 0, 0.5, 1]) { const y = Y(v * mx); ctx.beginPath(); ctx.moveTo(PAD.l, y); ctx.lineTo(PAD.l + g.pw, y); ctx.stroke(); ctx.fillText(Math.round(v * mx), PAD.l - 6, y + 4); }
+  ctx.textAlign = "center";
+  const xs = Math.max(1, niceStep(N, 10));
+  for (let n = 0; n < N; n += xs) ctx.fillText(n, X(n), PAD.t + g.ph + 15);
+  ctx.fillText("Tap index (integer coefficient values)", PAD.l + g.pw / 2, PAD.t + g.ph + 32);
+  ctx.strokeStyle = css("--line"); ctx.strokeRect(PAD.l, PAD.t, g.pw, g.ph);
+  ctx.strokeStyle = css("--accent"); ctx.fillStyle = css("--accent");
+  for (let n = 0; n < N; n++) { const x = X(n); ctx.beginPath(); ctx.moveTo(x, Y(0)); ctx.lineTo(x, Y(h[n])); ctx.stroke(); ctx.beginPath(); ctx.arc(x, Y(h[n]), N > 300 ? 1 : 2, 0, 2 * Math.PI); ctx.fill(); }
+  state.geom = { imp: true, X, N, g };
+}
+
+cv.addEventListener("pointermove", e => {
+  const r = cv.getBoundingClientRect(); state.hover = { x: e.clientX - r.left, y: e.clientY - r.top };
+  const ro = $("readout"), gm = state.geom, d = state.design;
+  if (!gm || !d || !d.h) { ro.hidden = true; return; }
+  if (gm.imp) {
+    const n = Math.floor((state.hover.x - PAD.l) / gm.g.pw * gm.N);
+    if (n >= 0 && n < gm.N) { ro.hidden = false; ro.textContent = `tap ${n}\ninteger ${d.q.ints[n]}\nfloat   ${d.h[n].toExponential(6)}`; } else ro.hidden = true;
+    return;
+  }
+  const f = gm.x0 + (state.hover.x - PAD.l) / gm.g.pw * (gm.x1 - gm.x0);
+  if (f < gm.x0 || f > gm.x1) { ro.hidden = true; draw(); return; }
+  const dp = state.tab === "mag" ? 2 : 3, un = yUnit();
+  const parts = [`f = ${(f / U()).toFixed(5)} ${uName()}`];
+  for (const c of cached || []) parts.push(`${c.key === "float" ? "Designed " : c.key === "q" ? "Quantised" : "Reference"} ${evalY(c.key, f).toFixed(dp)} ${un}`);
+  ro.hidden = false; ro.textContent = parts.join("\n");
+  draw();
+});
+cv.addEventListener("pointerleave", () => { state.hover = null; $("readout").hidden = true; draw(); });
+cv.addEventListener("click", e => {
+  const gm = state.geom; if (!gm || gm.imp) return;
+  const r = cv.getBoundingClientRect(), px = e.clientX - r.left, py = e.clientY - r.top;
+  const hit = state.tips.findIndex(t => t.tab === state.tab && Math.hypot(gm.X(t.f) - px, gm.Y(evalY(t.key, t.f)) - py) < 10);
+  if (hit >= 0) { state.tips.splice(hit, 1); draw(); return; }
+  const f = gm.x0 + (px - PAD.l) / gm.g.pw * (gm.x1 - gm.x0);
+  if (f < gm.x0 || f > gm.x1) return;
+  let best = null;
+  for (const c of cached || []) { const v = evalY(c.key, f); if (!isFinite(v)) continue; const dy = Math.abs(gm.Y(v) - py); if (!best || dy < best.dy) best = { key: c.key, dy }; }
+  if (best) { state.tips.push({ f, key: best.key, tab: state.tab }); draw(); }
+});
+
+/* ---------- interferer ---------- */
+function interfererCheck(d) {
+  if (!$("imOn").checked) return null;
+  const u = U(), off = num("imOff") * u, ch = num("imCh") * u, devPct = num("imDev"), tone = num("imTone");
+  const acs = num("imAcs"), ci = num("imCi"), mg = num("imMargin");
+  if (![off, ch, devPct, tone, acs, ci, mg].every(isFinite) || tone <= 0) return { error: "Fill in every interferer field." };
+  const dev = devPct / 100 * ch, beta = dev / tone;
+  const target = acs + ci + mg;
+  const lines = [];
+  let pTot = 0, jTot = 0;
+  const K = Math.ceil(beta + 12);
+  for (let k = -K; k <= K; k++) {
+    const J = FIR.besselJ(k, beta), p = J * J; jTot += p;
+    const lvl = 10 * Math.log10(Math.max(p, 1e-30));
+    const f = Math.abs(off + k * tone);
+    if (f > d.spec.fs / 2) continue;
+    const attQ = -evalDb("q", f), attF = -evalDb("float", f);
+    pTot += p * 10 ** (-attQ / 10);
+    if (lvl > -80) lines.push({ k, f, lvl, need: target + lvl, attQ, attF, margin: attQ - (target + lvl) });
+  }
+  const rej = -10 * Math.log10(pTot / jTot);
+  return { beta, dev, target, lines, rej, cIAfter: rej - acs, acsLimit: rej - ci, pass: rej - acs >= ci + mg };
+}
+
+/* ---------- render readouts ---------- */
+function metricHTML(label, value, sub) { return `<div class="metric"><span class="label">${label}</span><span class="v">${value}</span>${sub ? `<span class="s">${sub}</span>` : ""}</div>`; }
+function edgeStr(arr) { return arr.length ? arr.map(f => fmtF(f)).join(", ") : "—"; }
+
+function renderAll() {
+  const d = state.design, chips = $("chips");
+  const errEl = $("freqHint");
+  if (!d || d.errors.length) {
+    chips.innerHTML = `<span class="chip err">${d ? d.errors[0] : "No design"}</span>`;
+    errEl.className = "hint err"; errEl.textContent = d ? d.errors.join(" ") : "";
+    $("metrics").innerHTML = ""; $("imSummary").textContent = ""; $("imTable").innerHTML = ""; $("exportPreview").value = "";
+    draw(); return;
+  }
+  errEl.className = "hint"; errEl.textContent = `Fs/2 = ${fmtF(d.spec.fs / 2)}. Transition band(s): ${d.bands.slice(1).map((b, i) => fmtF((b.lo - d.bands[i].hi) * d.spec.fs)).join(", ")}.`;
+  d.ref = refInfo(d.spec, d.bands);
+  d.im = interfererCheck(d);
+  const { m, mq, q, N } = d;
+
+  const methodName = d.method === "equiripple" ? "Equiripple" : d.method === "ls" ? "Least-squares" : `${$("win").selectedOptions[0].text} window`;
+  chips.innerHTML = [
+    `<span class="chip">${methodName}</span>`,
+    `<span class="chip">${N} taps</span>`,
+    `<span class="chip">−3 dB ${edgeStr(m.cross3)}</span>`,
+    `<span class="chip">Stop ${fmtDb(mq.stopAtt)} dB (${q.ints.length && $("bits").value}-bit)</span>`,
+    d.im && !d.im.error ? `<span class="chip ${d.im.pass ? "ok" : "err"}">ACS limit ${d.im.acsLimit.toFixed(1)} dB</span>` : ""
+  ].join("");
+
+  // order hint
+  const oh = $("orderHint");
+  if (d.om === "minimum") { oh.className = d.search.found ? "hint" : "hint err";
+    oh.textContent = d.search.found ? `Minimum length found: ${N} taps (order ${N - 1}). Estimate was ${d.est.taps}.` : d.notes[d.notes.length - 1]; }
+  else { oh.className = d.notes.length ? "hint warn" : "hint"; oh.textContent = d.notes.length ? d.notes.join(" ") : `Group delay ${(N - 1) / 2} samples = ${fmtTime((N - 1) / 2 / d.spec.fs)}.`; }
+
+  // quant hint
+  const qh = $("qHint");
+  const headroom = 20 * Math.log10(q.sumAbs / Math.abs(q.sum || 1));
+  qh.className = q.clipped ? "hint err" : "hint";
+  qh.textContent = q.clipped ? `Some taps exceed ${$("bits").value}-bit range and were clipped. Lower the gain shift S.`
+    : $("qmode").value === "gain" ? `S = ${q.shift}: sum of taps ${q.sum} (2^${q.shift} = ${2 ** q.shift}), largest tap ${q.maxAbs}.`
+    : `Scale factor ${q.scale.toPrecision(6)}, largest tap ${q.maxAbs}.`;
+
+  // ref hint
+  const rh = $("refHint");
+  if (!d.ref) rh.textContent = "";
+  else if (d.ref.error) { rh.className = "hint err"; rh.textContent = d.ref.error; }
+  else { rh.className = "hint"; rh.textContent = `${d.ref.raw.length} taps, ${d.ref.sym ? "symmetric" : "not symmetric"}, passband gain ${+d.ref.gain.toPrecision(7)}${Number.isInteger(Math.log2(Math.round(d.ref.gain))) ? "" : ` (≈ 2^${Math.log2(d.ref.gain).toFixed(2)})`}.`; }
+
+  // metrics
+  const rm = d.ref && d.ref.m;
+  const sub = (a, b) => [a, b].filter(Boolean).join(" · ");
+  $("metrics").innerHTML = [
+    metricHTML("Length", `${N} <small>taps</small>`, `delay ${(N - 1) / 2} samples · ${fmtTime((N - 1) / 2 / d.spec.fs)}`),
+    metricHTML("−3 dB", edgeStr(m.cross3), sub(`quantised ${edgeStr(mq.cross3)}`, rm && `ref ${edgeStr(rm.cross3)}`)),
+    metricHTML("−6 dB", edgeStr(m.cross6), rm ? `ref ${edgeStr(rm.cross6)}` : ""),
+    metricHTML("Passband ripple", `${m.ripple < 0.01 ? m.ripple.toFixed(4) : m.ripple.toFixed(3)} <small>dB p-p</small>`, sub(`quantised ${mq.ripple.toFixed(4)}`, rm && `ref ${rm.ripple.toFixed(4)}`)),
+    metricHTML("Stopband (float)", `${fmtDb(m.stopAtt)} <small>dB</small>`, "minimum attenuation over all stopbands"),
+    metricHTML(`Stopband (${$("bits").value}-bit)`, `${fmtDb(mq.stopAtt)} <small>dB</small>`, rm ? `ref ${fmtDb(rm.stopAtt)} dB` : "after rounding taps"),
+    metricHTML("Sum of taps", `${q.sum}`, $("qmode").value === "gain" ? `output shift S = ${q.shift}` : `scale ${q.scale.toPrecision(6)}`),
+    metricHTML("Worst-case gain", `${headroom.toFixed(2)} <small>dB</small>`, `Σ|h| = ${q.sumAbs}; allow this headroom`)
+  ].join("");
+  $("measNote").textContent = `${d.method === "equiripple" ? `${d.iters} Remez iterations, ` : ""}${d.beta != null ? `β = ${d.beta.toFixed(3)}, ` : ""}designed in ${d.ms.toFixed(0)} ms`;
+
+  // interferer
+  if (d.im) {
+    if (d.im.error) { $("imSummary").textContent = d.im.error; $("imTable").innerHTML = ""; }
+    else {
+      const im = d.im;
+      $("imNote").textContent = `β = ${im.beta.toFixed(3)}, deviation ${im.dev.toFixed(0)} Hz. Each line must sit ${im.target.toFixed(0)} dB below the interferer total (ACS + C/I + margin).`;
+      $("imSummary").innerHTML = `<span>Interferer rejection <b>${im.rej.toFixed(1)} dB</b></span>
+        <span>C/I after filter at ACS target <b>${im.cIAfter >= 0 ? "+" : ""}${im.cIAfter.toFixed(1)} dB</b></span>
+        <span>Filter-limited ACS <b>${im.acsLimit.toFixed(1)} dB</b></span>
+        <span class="pill ${im.pass ? "ok" : "bad"}">${im.pass ? "Meets target" : "Below target"}</span>`;
+      const rows = im.lines.filter(l => l.need > 0).sort((a, b) => a.f - b.f);
+      $("imTable").innerHTML = `<thead><tr><th>Sideband k</th><th>Offset (${uName()})</th><th>Line level (dBc)</th><th>Required (dB)</th><th>Achieved, quantised (dB)</th><th>Margin (dB)</th><th></th></tr></thead><tbody>` +
+        rows.map(l => `<tr><td>${l.k > 0 ? "+" : ""}${l.k}</td><td>${(l.f / U()).toFixed(4)}</td><td>${l.lvl.toFixed(1)}</td><td>${l.need.toFixed(1)}</td><td>${l.attQ.toFixed(1)}</td><td>${l.margin >= 0 ? "+" : ""}${l.margin.toFixed(1)}</td><td><span class="pill ${l.margin >= 0 ? "ok" : "bad"}">${l.margin >= 0 ? "Pass" : "Fail"}</span></td></tr>`).join("") + "</tbody>";
+    }
+  }
+  $("plotNote").textContent = d.notes.length && d.om === "specify" ? d.notes[0] : "";
+  renderExport();
+  draw();
+}
+function fmtTime(s) { return s >= 1e-3 ? `${(s * 1e3).toFixed(3)} ms` : `${(s * 1e6).toFixed(2)} µs`; }
+
+/* ---------- export ---------- */
+function exportContent() {
+  const d = state.design; if (!d || !d.h) return null;
+  const fmt = document.querySelector("input[name=fmt]:checked").value;
+  const bits = Math.round(num("bits")), type = d.spec.type, N = d.N;
+  const base = `fir_${type}_${N}taps_${bits}bit`;
+  const specLine = describeSpec(d);
+  if (fmt === "int") return { name: `${base}.txt`, text: d.q.ints.join("\n") + "\n" };
+  if (fmt === "float") return { name: `${base}_float.txt`, text: Array.from(d.h, v => v.toExponential(15)).join("\n") + "\n" };
+  if (fmt === "csv") return { name: `${base}.csv`, text: "index,float,integer\n" + Array.from(d.h, (v, i) => `${i},${v.toExponential(15)},${d.q.ints[i]}`).join("\n") + "\n" };
+  if (fmt === "c") {
+    const ctype = bits <= 16 ? "int16_t" : "int32_t", P = "FIR";
+    const body = [];
+    for (let i = 0; i < N; i += 8) body.push("    " + d.q.ints.slice(i, i + 8).map(v => String(v).padStart(7)).join(",") + (i + 8 < N ? "," : ""));
+    return { name: `${base}_c_array.txt`, text:
+`/* ${specLine}
+ * ${bits}-bit coefficients, ${$("qmode").selectedOptions[0].text}
+ * Sum of taps = ${d.q.sum}${d.q.shift != null ? `, shift output right by ${d.q.shift}` : ""}
+ * Stopband: ${fmtDb(d.mq.stopAtt)} dB (quantised), ${fmtDb(d.m.stopAtt)} dB (float)
+ */
+#include <stdint.h>
+
+#define ${P}_NTAPS ${N}
+${d.q.shift != null ? `#define ${P}_SHIFT ${d.q.shift}\n` : ""}
+static const ${ctype} fir_coeffs[${P}_NTAPS] = {
+${body.join("\n")}
+};
+` };
+  }
+  return { name: `${base}.json`, text: JSON.stringify({
+    description: specLine, settings: snapshot(), spec: d.spec, taps: N,
+    measurements: { minus3dB_Hz: d.m.cross3, minus6dB_Hz: d.m.cross6, passbandRipple_dB: d.m.ripple, stopband_dB_float: d.m.stopAtt, stopband_dB_quantised: d.mq.stopAtt,
+      interferer: d.im && !d.im.error ? { rejection_dB: d.im.rej, filterLimitedACS_dB: d.im.acsLimit } : null },
+    quantisation: { bits, mode: $("qmode").value, shift: d.q.shift, sum: d.q.sum, scale: d.q.scale },
+    integer: d.q.ints, float: Array.from(d.h) }, null, 2) + "\n" };
+}
+function describeSpec(d) {
+  const s = d.spec, f = k => fmtF(s[k]);
+  const edges = s.type === "lowpass" ? `Fpass ${f("fpass")}, Fstop ${f("fstop")}` : s.type === "highpass" ? `Fstop ${f("fstop")}, Fpass ${f("fpass")}`
+    : s.type === "bandpass" ? `Fstop1 ${f("fstop1")}, Fpass1 ${f("fpass1")}, Fpass2 ${f("fpass2")}, Fstop2 ${f("fstop2")}`
+    : `Fpass1 ${f("fpass1")}, Fstop1 ${f("fstop1")}, Fstop2 ${f("fstop2")}, Fpass2 ${f("fpass2")}`;
+  const meth = d.method === "equiripple" ? "equiripple" : d.method === "ls" ? "least-squares" : `${$("win").value} window`;
+  return `${s.type} FIR, ${meth}, ${d.N} taps, Fs ${fmtF(s.fs)}, ${edges}`;
+}
+function renderExport() { const c = exportContent(); $("exportPreview").value = c ? c.text : ""; }
+
+let downloads = null, inViewer = false;
+function setStatus(msg, cls) { const s = $("exportStatus"); s.textContent = msg; s.className = "status " + (cls || ""); }
+$("dlBtn").addEventListener("click", async () => {
+  const c = exportContent(); if (!c) return;
+  if (downloads) {
+    try { await downloads.save({ filename: c.name, data: c.text }); setStatus(`Saved ${c.name}`, "ok"); }
+    catch (e) {
+      const code = e && e.code;
+      if (code === "declined") setStatus("Download cancelled.");
+      else if (code === "rate_limited") setStatus("A save prompt is already open. Finish it, then try again.", "err");
+      else { setStatus("Downloads are not available here. Use Copy instead.", "err"); }
+    }
+    return;
+  }
+  if (!inViewer) {          // opened as a local file: plain browser download works
+    const a = document.createElement("a"); a.href = URL.createObjectURL(new Blob([c.text], { type: "text/plain" })); a.download = c.name;
+    document.body.appendChild(a); a.click(); a.remove(); setTimeout(() => URL.revokeObjectURL(a.href), 2000);
+    setStatus(`Saved ${c.name}`, "ok");
+  } else setStatus("Downloads are not available in this view. Use Copy instead.", "err");
+});
+$("copyBtn").addEventListener("click", async () => {
+  const ta = $("exportPreview");
+  try { await navigator.clipboard.writeText(ta.value); setStatus("Copied to clipboard.", "ok"); }
+  catch (e) { ta.focus(); ta.select(); setStatus("Text selected. Press Ctrl+C (or ⌘C) to copy.", ""); }
+});
+
+/* ---------- wiring ---------- */
+let timer = null;
+function schedule(immediate) {
+  clearTimeout(timer);
+  timer = setTimeout(() => { syncForm(); runDesign(); renderAll(); save(); setDirty(false); }, immediate ? 0 : 180);
+}
+function setDirty(on) {
+  $("dirtyNote").textContent = on ? "Settings changed. Press Design to update." : "";
+  $("designBtn").classList.toggle("pending", on);
+}
+function onSettingChange() {
+  syncForm();
+  if ($("autoDesign").checked) schedule(); else { setDirty(true); save(); }
+}
+document.querySelectorAll("aside input, aside select, aside textarea").forEach(el => {
+  if (el.id === "autoDesign") return;
+  el.addEventListener("input", onSettingChange);
+  el.addEventListener("change", onSettingChange);
+  if (el.tagName === "INPUT") el.addEventListener("keydown", e => { if (e.key === "Enter") { e.preventDefault(); schedule(true); } });
+});
+$("designBtn").addEventListener("click", () => schedule(true));
+$("autoDesign").addEventListener("change", () => { save(); if ($("autoDesign").checked) schedule(true); });
+document.addEventListener("keydown", e => { if (e.key === "Enter" && (e.ctrlKey || e.metaKey)) { e.preventDefault(); schedule(true); } });
+document.querySelectorAll("input[name=fmt]").forEach(el => el.addEventListener("change", () => { renderExport(); save(); }));
+["showQ", "showRef", "phaseMode", "gdUnit"].forEach(id => $(id).addEventListener("change", () => { draw(); save(); }));
+$("yMin").addEventListener("input", () => { draw(); save(); });
+
+let prevUnit = Number($("units").value);
+$("units").addEventListener("change", () => {
+  const nu = Number($("units").value), k = prevUnit / nu;
+  for (const id of ["fs", "e1", "e2", "e3", "e4", "e5", "e6", "imOff", "imCh"]) { const v = num(id); if (isFinite(v)) $(id).value = +(v * k).toPrecision(10); }
+  for (const id of ["xMin", "xMax"]) { const v = num(id); if (isFinite(v)) $(id).value = +(v * k).toPrecision(10); }
+  prevUnit = nu;
+});
+
+function setView(x0, x1) {
+  state.view = { x0, x1 };
+  $("xMin").value = x0 == null ? "" : +(x0 / U()).toPrecision(8);
+  $("xMax").value = x1 == null ? "" : +(x1 / U()).toPrecision(8);
+  draw();
+}
+$("xMin").addEventListener("change", () => { const v = num("xMin"); state.view.x0 = isFinite(v) ? v * U() : null; draw(); });
+$("xMax").addEventListener("change", () => { const v = num("xMax"); state.view.x1 = isFinite(v) ? v * U() : null; draw(); });
+$("zoomFull").addEventListener("click", () => { setView(null, null); });
+$("zoomPass").addEventListener("click", () => {
+  const d = state.design; if (!d || !d.bands) return;
+  const pb = d.bands.filter(b => b.d), fs = d.spec.fs;
+  const lo = Math.min(...pb.map(b => b.lo)) * fs, hi = Math.max(...pb.map(b => b.hi)) * fs;
+  const stop = d.bands.filter(b => !b.d);
+  // show passband plus the transition into the nearest stopband
+  const hiEdge = Math.min(fs / 2, Math.max(hi, ...stop.map(b => b.lo * fs).filter(f => f > hi).slice(0, 1)) * 1.15 + 1e-9);
+  setView(Math.max(0, lo - (hiEdge - hi) * 0.2), hiEdge);
+});
+$("clearTips").addEventListener("click", () => { state.tips = []; draw(); });
+const TABS = ["mag", "phase", "gd", "imp"];
+TABS.forEach(t => $("tab-" + t).addEventListener("click", () => setTab(t)));
+function setTab(t) {
+  state.tab = t;
+  TABS.forEach(k => $("tab-" + k).setAttribute("aria-selected", k === t));
+  $("magTools").hidden = t === "imp"; $("legend").hidden = t === "imp"; $("readout").hidden = true;
+  $("yMinField").hidden = t !== "mag"; $("phaseField").hidden = t !== "phase"; $("gdField").hidden = t !== "gd";
+  $("legIm").hidden = t !== "mag" || !$("imOn").checked;
+  $("plot").setAttribute("aria-label", { mag: "Filter magnitude response", phase: "Filter phase response", gd: "Filter group delay", imp: "Filter impulse response" }[t]);
+  try { localStorage.setItem(STORE_KEY + "-tab", t); } catch (e) {}
+  draw();
+}
+$("refLoadBtn").addEventListener("click", () => $("refFile").click());
+$("refFile").addEventListener("change", e => {
+  const file = e.target.files[0]; if (!file) return;
+  const r = new FileReader();
+  r.onload = () => { $("refCoeffs").value = String(r.result); $("refName").value = file.name.replace(/\.[^.]+$/, ""); $("refOn").checked = true; schedule(true); };
+  r.readAsText(file); e.target.value = "";
+});
+$("refUseDesign").addEventListener("click", () => {
+  const d = state.design; if (!d || !d.q) return;
+  $("refCoeffs").value = d.q.ints.join("\n"); $("refName").value = `Saved design (${d.N} taps)`; $("refOn").checked = true; schedule(true);
+});
+$("resetBtn").addEventListener("click", () => { apply(DEFAULTS); prevUnit = Number($("units").value); state.tips = []; setView(null, null); schedule(true); });
+
+const themeObs = new MutationObserver(() => draw());
+themeObs.observe(document.documentElement, { attributes: true, attributeFilter: ["data-theme"] });
+try { matchMedia("(prefers-color-scheme: dark)").addEventListener("change", () => draw()); } catch (e) {}
+new ResizeObserver(() => draw()).observe(cv);
+
+/* ---------- boot ---------- */
+$("refCoeffs").value = CMX983.join("\n");
+Object.assign(DEFAULTS, snapshot());
+load();
+prevUnit = Number($("units").value);
+syncForm(); runDesign(); renderAll();
+// default data tips like the CMX983 plot: -3 dB point and stopband edge
+(() => { const d = state.design; if (d && d.m && d.m.cross3.length && state.tips.length === 0) { state.tips.push({ f: d.m.cross3[0], key: "float", tab: "mag" }); const sb = d.bands.find(b => !b.d); if (sb) state.tips.push({ f: sb.lo * d.spec.fs, key: "float", tab: "mag" }); draw(); } })();
+try { const t = localStorage.getItem(STORE_KEY + "-tab"); if (TABS.includes(t)) setTab(t); } catch (e) {}
+
+if (window.claude && typeof window.claude.use === "function") {
+  inViewer = true;
+  window.claude.use("downloads").then(ns => { downloads = ns; if (!ns) setStatus("Downloads are not available in this view. Use Copy instead."); }).catch(() => {});
+}
+})();
+</script>
+
+</body></html>

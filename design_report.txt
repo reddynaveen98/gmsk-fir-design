@@ -1,0 +1,24 @@
+fs=90000 Hz, taps=125, group delay=62 samples = 0.689 ms
+Parks-McClellan: passband 0-1800 Hz, stopband 5500-45000 Hz, stop weight 30
+Passband ripple 0.006 dB p-p, min stopband attenuation 98.0 dB
+Sum of taps (DC gain) 0.999629
+
+A-M3 rejection (BT 0.3 wanted): 96.9 dB  -> C/I after filter at +60 dB = +36.9 dB
+A-M3 rejection (BT 0.5 wanted): 96.9 dB  -> C/I after filter at +60 dB = +36.9 dB
+Wanted-signal NMSE (filter distortion): BT0.3 -38.0 dB, BT0.5 -30.6 dB
+Q1.15 coefficients: rejection 84.5 dB, NMSE -38.0 dB
+
+Offset(Hz)  Atten float(dB)  Atten Q1.15(dB)
+     2400             0.4             0.4
+     3000             2.6             2.6
+     4000            14.4            14.4
+     5100            51.8            51.4
+     5500            98.2            78.5
+     5900            98.2            82.0
+     6300            98.1            83.4
+     6700            99.7            89.2
+     7100           115.7            81.3
+     7500           100.5            81.6
+     8000            98.2            94.0
+    10000            98.5            80.9
+    20000           102.8            81.3
